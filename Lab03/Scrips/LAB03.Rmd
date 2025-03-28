@@ -1,0 +1,140 @@
+---
+title: "LAB03 - Análisis Exploratorio de Datos"
+author: 
+  - "Integrante 1: Stefanny"
+  - "Integrante 2: Saimon"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(janitor)
+library(scales)
+library(corrplot)
+library(gridExtra)
+```
+
+# 🎓 Universidad Técnica Nacional
+
+## Curso: Minería de Datos - ISW911
+
+## Laboratorio #3 - Análisis Exploratorio de Datos (EDA)
+
+```{r}
+# 1. Carga de Datos
+datos <- read_csv("../Files/train.csv")
+glimpse(datos)
+
+# 2. Exploración Inicial
+str(datos)
+summary(datos)
+
+# 3. Limpieza y Tratamiento de Datos
+
+# 3.1 Renombrar columnas a español
+datos <- datos %>%
+  clean_names() %>%
+  rename(
+    sobrevivio = survived,
+    clase = pclass,
+    nombre = name,
+    sexo = sex,
+    edad = age,
+    hermanos_esposos = sib_sp,
+    padres_hijos = parch,
+    boleto = ticket,
+    tarifa = fare,
+    cabina = cabin,
+    embarque = embarked
+  )
+
+# 3.2 Eliminar columnas irrelevantes
+datos <- datos %>% select(-nombre, -cabina, -boleto)
+
+# 3.3 Eliminar duplicados
+datos <- datos[!duplicated(datos), ]
+
+# 3.4 Conversión de variables
+datos <- datos %>%
+  mutate(
+    clase = factor(clase),
+    sexo = factor(sexo),
+    embarque = factor(embarque),
+    sobrevivio = factor(sobrevivio),
+    edad = as.numeric(edad),
+    tarifa = as.numeric(tarifa)
+  )
+
+# 3.5 Valores nulos
+colSums(is.na(datos))
+
+# 3.6 Boxplots para detectar valores atípicos
+boxplot(datos$edad, main = "Boxplot de Edad", col = "purple")
+boxplot(datos$tarifa, main = "Boxplot de Tarifa", col = "darkred")
+
+# 3.7 Márgenes atípicos
+Q1_edad <- quantile(datos$edad, 0.25, na.rm = TRUE)
+Q3_edad <- quantile(datos$edad, 0.75, na.rm = TRUE)
+IQR_edad <- Q3_edad - Q1_edad
+lim_inf_edad <- Q1_edad - 1.5 * IQR_edad
+lim_sup_edad <- Q3_edad + 1.5 * IQR_edad
+lim_inf_edad; lim_sup_edad
+
+# 3.8 Histogramas y dispersión
+ggplot(datos, aes(edad)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Histograma de Edad")
+
+ggplot(datos, aes(x = edad, y = tarifa)) +
+  geom_point(alpha = 0.5, color = "#8e44ad") +
+  labs(title = "Dispersión entre Edad y Tarifa")
+
+# 3.9 Corrección de datos nulos y atípicos
+corregir_nulos <- function(x) {
+  if (is.numeric(x)) {
+    x[is.na(x)] <- median(x, na.rm = TRUE)
+  } else {
+    x[is.na(x)] <- "Desconocido"
+  }
+  return(x)
+}
+datos <- datos %>% mutate(across(everything(), corregir_nulos))
+```
+
+```{r visual_cat, fig.width=10, fig.height=6}
+# 4. Visualización de Variables Categóricas
+graficar_categoricas <- function(df) {
+  cat_vars <- names(df)[sapply(df, is.factor)]
+  plots <- lapply(cat_vars, function(var) {
+    ggplot(df, aes_string(x = var)) +
+      geom_bar(fill = "#8e44ad") +
+      labs(title = paste("Distribución de", var), x = var, y = "Cantidad") +
+      theme_minimal()
+  })
+  do.call(grid.arrange, c(plots, ncol = 2))  # 2 por fila
+}
+graficar_categoricas(datos)
+```
+
+```{r correlacion, fig.width=10, fig.height=6}
+# 5.1 Correlación entre variables numéricas
+numericas <- datos %>% select(where(is.numeric))
+correlaciones <- cor(numericas)
+corrplot(correlaciones, method = "circle", type = "upper", 
+         tl.col = "black", tl.cex = 0.8, tl.srt = 45)
+```
+
+```{r}
+# 5.2 Normalización
+datos_norm <- numericas %>%
+  mutate(across(everything(), ~scale(.)))
+summary(datos_norm)
+```
+
+**Autores:** Stefanny y Saimon\
+**Curso:** Minería de Datos - ISW911\
+**Universidad Técnica Nacional**
